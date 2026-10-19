@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f7a4d">
+<title>Room Khana Hisaab</title>
+<style>
+:root{--bg:#f4f6f4;--card:#fff;--tx:#17211b;--mut:#6a7a70;--pri:#1f7a4d;--onpri:#fff;--good:#14803c;--bad:#c62828;--line:#dfe6e1;--chip:#e7f2ec;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1512;--card:#18201b;--tx:#e8f0ea;--mut:#93a499;--pri:#3fb97a;--onpri:#06150d;--good:#5fd68b;--bad:#ff7b72;--line:#27332c;--chip:#1f2c24;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1512;--card:#18201b;--tx:#e8f0ea;--mut:#93a499;--pri:#3fb97a;--onpri:#06150d;--good:#5fd68b;--bad:#ff7b72;--line:#27332c;--chip:#1f2c24;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:76px}
+header{background:var(--pri);color:var(--onpri);padding:14px 16px 12px}
+header h1{margin:0;font-size:19px}
+header p{margin:2px 0 0;font-size:12.5px;opacity:.9}
+main{max-width:620px;margin:0 auto;padding:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.card h2{margin:0 0 8px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+select,input,textarea,button{font:inherit;color:var(--tx)}
+select,input,textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-bottom:8px}
+label{font-size:12px;color:var(--mut);display:block;margin-bottom:2px}
+button{border:0;border-radius:10px;padding:10px 14px;background:var(--pri);color:var(--onpri);font-weight:600;cursor:pointer}
+button.sec{background:var(--chip);color:var(--tx)}
+button.del{background:transparent;color:var(--bad);padding:4px 8px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:var(--chip);border-radius:12px;padding:10px}
+.stat b{display:block;font-size:20px}.stat span{font-size:12px;color:var(--mut)}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:12px;color:var(--mut)}
+.good{color:var(--good);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;background:var(--chip);font-size:12px;font-weight:600}
+.item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
+.item small{color:var(--mut);display:block}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;background:none;color:var(--mut);border-radius:0;padding:10px 2px;font-size:12px}
+nav button.on{color:var(--pri)}
+nav button span{display:block;font-size:19px}
+.empty{color:var(--mut);text-align:center;padding:14px}
+</style>
+</head>
+<body>
+<header><h1>🍛 Room Khana Hisaab</h1><p id="sub"></p></header>
+<main id="app"></main>
+<nav id="nav"></nav>
+<script>
+const KEY='roomKhanaV2';
+const DEF={members:['Nasruddin','Shahbuddin','Mustakim','Pappu','Soban'],cats:['Ration','Sabzi','Doodh','Gas','Gosht/Anda','Other'],entries:[],periods:[{s:'2026-10-01',e:null}]};
+let S;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.members)S=JSON.parse(JSON.stringify(DEF));
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+let tab='h',sel=S.periods.length-1,msg='';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fm=n=>Math.round(n).toLocaleString('en-IN');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fd=s=>{if(!s)return'';const[y,m,d]=s.split('-');return d+'-'+MON[+m-1]+'-'+y};
+function addDay(s){const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function P(){return S.periods[sel]}
+function inP(e,p=P()){return e.date>=p.s&&e.date<=(p.e||'9999-12-31')}
+function pEntries(p=P()){return S.entries.filter(e=>inP(e,p)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id)}
+function names(){return S.members.filter(n=>n.trim())}
+function calc(p=P()){
+  const es=pEntries(p),m=names().slice();if(p.e)es.forEach(e=>{if(!m.includes(e.by))m.push(e.by)});const total=es.reduce((a,e)=>a+e.amount,0),per=m.length?total/m.length:0;
+  const rows=m.map(n=>{const mine=es.filter(e=>e.by===n),paid=mine.reduce((a,e)=>a+e.amount,0);
+    const cats=S.cats.map(c=>mine.filter(e=>e.cat===c).reduce((a,e)=>a+e.amount,0));
+    return{n,paid,bal:paid-per,cats}});
+  return{es,m,total,per,rows}}
+function status(b){return b>0.5?'<span class="good">Lena hai '+fm(b)+'</span>':b<-0.5?'<span class="bad">Dena hai '+fm(-b)+'</span>':'Barabar'}
+function periodLabel(p,i){return 'Hisaab No. '+(i+1)+' · '+fd(p.s)+' se '+(p.e?fd(p.e):'abhi tak')+(p.e?'':' (CHALU)')+(!p.e&&p.plan?' · target '+fd(p.plan):'')}
+function nav(){
+  const T=[['h','📊','Hisaab'],['e','➕','Entry'],['p','🗓️','Period'],['s','⚙️','Setting']];
+  $('nav').innerHTML=T.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="go('${t[0]}')"><span>${t[1]}</span>${t[2]}</button>`).join('')}
+function go(t){tab=t;msg='';render();window.scrollTo(0,0)}
+function pick(){return `<div class="card"><label>Hisaab chuno</label><select onchange="sel=+this.value;render()">${S.periods.map((p,i)=>`<option value="${i}" ${i===sel?'selected':''}>${esc(periodLabel(p,i))}</option>`).join('')}</select></div>`}
+function render(){nav();$('sub').textContent=periodLabel(P(),sel);({h:rH,e:rE,p:rP,s:rS})[tab]()}
+
+function rH(){
+  const c=calc();
+  let h=pick()+`<div class="card"><div class="stats">
+  <div class="stat"><span>Total kharcha</span><b>₹${fm(c.total)}</b></div>
+  <div class="stat"><span>Per person hissa</span><b>₹${fm(c.per)}</b></div>
+  <div class="stat"><span>Members</span><b>${c.m.length}</b></div>
+  <div class="stat"><span>Total entries</span><b>${c.es.length}</b></div></div></div>
+  <div class="card"><h2>Kon kitna diya / kisko kitna dena hai</h2><div class="scroll"><table><tr><th>Naam</th><th>Diya</th><th>Status</th></tr>
+  ${c.rows.map(r=>`<tr><td>${esc(r.n)}</td><td>₹${fm(r.paid)}</td><td>${status(r.bal)}</td></tr>`).join('')}
+  <tr><td><b>Total</b></td><td><b>₹${fm(c.total)}</b></td><td></td></tr></table></div>
+  <p style="font-size:12px;color:var(--mut);margin:8px 0 0">Hara = paise wapas milenge · Laal = paise dene hain</p></div>
+  <div class="card"><h2>Sabka alag alag — category wise</h2><div class="scroll"><table><tr><th>Naam</th>${S.cats.map(x=>`<th>${esc(x)}</th>`).join('')}<th>Total</th></tr>
+  ${c.rows.map(r=>`<tr><td>${esc(r.n)}</td>${r.cats.map(v=>`<td>${fm(v)}</td>`).join('')}<td><b>${fm(r.paid)}</b></td></tr>`).join('')}
+  <tr><td><b>Total</b></td>${S.cats.map((_,i)=>`<td><b>${fm(c.rows.reduce((a,r)=>a+r.cats[i],0))}</b></td>`).join('')}<td><b>${fm(c.total)}</b></td></tr></table></div></div>
+  <button style="width:100%" onclick="share()">📤 WhatsApp pe hisaab bhejo</button>`;
+  $('app').innerHTML=h}
+
+function share(){
+  const c=calc(),t=`*Room Khana Hisaab*\n${periodLabel(P(),sel)}\nTotal: ₹${fm(c.total)} | Per person: ₹${fm(c.per)}\n\n`+c.rows.map(r=>`${r.n}: diya ₹${fm(r.paid)} → `+(r.bal>0.5?'Lena hai '+fm(r.bal):r.bal<-0.5?'Dena hai '+fm(-r.bal):'Barabar')).join('\n');
+  if(window.Android&&Android.share){Android.share(t)}
+  else if(navigator.share){navigator.share({text:t}).catch(()=>{})}
+  else if(navigator.clipboard){navigator.clipboard.writeText(t).then(()=>alert('Hisaab copy ho gaya, WhatsApp mein paste karo'),()=>prompt('Copy karo:',t))}
+  else prompt('Copy karo:',t)}
+
+function rE(){
+  const es=pEntries(),m=names();
+  $('app').innerHTML=pick()+`<div class="card"><h2>Naya kharcha</h2>
+  <div class="row"><div><label>Date</label><input type="date" id="fd" value="${today()}"></div><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="fa" placeholder="250" min="0"></div></div>
+  <label>Saman / Item</label><input id="fi" placeholder="Aata, Sabzi, Doodh...">
+  <div class="row"><div><label>Kisne diya</label><select id="fb">${m.map(n=>`<option>${esc(n)}</option>`).join('')}</select></div>
+  <div><label>Category</label><select id="fc">${S.cats.map(n=>`<option>${esc(n)}</option>`).join('')}</select></div></div>
+  <label>Note (optional)</label><input id="fn">
+  <button style="width:100%" onclick="addE()">Save karo</button><p id="em" style="color:var(--bad);margin:8px 0 0"></p></div>
+  <div class="card"><h2>Is hisaab ki entries (${es.length})</h2>${es.length?es.map(e=>`<div class="item"><div><b>${esc(e.item||'—')}</b><small>${fd(e.date)} · ${esc(e.by)} · ${esc(e.cat)}${e.note?' · '+esc(e.note):''}</small></div><div><b>₹${fm(e.amount)}</b><button class="del" onclick="delE(${e.id})">✕</button></div></div>`).join(''):'<div class="empty">Abhi koi entry nahi</div>'}</div>`}
+
+function addE(){
+  const d=$('fd').value,a=parseFloat($('fa').value),by=$('fb').value;
+  if(!d||!(a>=0)||isNaN(a)){$('em').textContent='Date aur amount sahi likho';return}
+  if(!by){$('em').textContent='Pehle Setting mein naam daalo';return}
+  const last=S.periods[S.periods.length-1];
+  if(d<S.periods[0].s){$('em').textContent='Date pehle hisaab se purani hai';return}
+  S.entries.push({id:Date.now(),date:d,item:$('fi').value.trim(),amount:a,by,cat:$('fc').value,note:$('fn').value.trim()});
+  save();
+  if(!inP({date:d})){/* entry may fall in another period */}
+  render()}
+function delE(id){if(confirm('Ye entry hatani hai?')){S.entries=S.entries.filter(e=>e.id!==id);save();render()}}
+
+function rP(){
+  const last=S.periods[S.periods.length-1],open=!last.e;
+  $('app').innerHTML=`<div class="card"><h2>Hisaab Period</h2>${S.periods.map((p,i)=>{const c=calc(p);return `<div class="item"><div><b>Hisaab No. ${i+1}</b> <span class="badge">${p.e?'COMPLETE':'CHALU'}</span><small>${fd(p.s)} se ${p.e?fd(p.e):'abhi tak'} · ${c.es.length} entries</small></div><div style="text-align:right"><b>₹${fm(c.total)}</b><small>₹${fm(c.per)} / person</small></div></div>`}).join('')}</div>
+  ${open?`<div class="card"><h2>Is hisaab ki avadhi</h2><p style="margin:0 0 8px;color:var(--mut);font-size:13px">${last.plan?'Target: '+fd(last.plan)+' tak ('+dl(last.plan)+')':'Koi target nahi. Chaho to avadhi chuno, ya jab marzi hisaab band karo.'}</p>
+  <div class="row" style="flex-wrap:wrap;margin-bottom:8px">${[['1 Hafta',7],['15 Din',15],['30 Din',30],['1 Saal',365]].map(x=>`<button class="sec" style="flex:1 1 40%" onclick="preset(${x[1]})">${x[0]}</button>`).join('')}</div>
+  <label>Ya apni target date chuno</label><input type="date" value="${last.plan||''}" onchange="setPlan(this.value)">
+  ${last.plan?`<button class="sec" style="width:100%;margin-bottom:8px" onclick="setPlan('')">Target hatao</button>`:''}
+  <label>Is hisaab ki shuruaat date</label><input type="date" value="${last.s}" onchange="setStart(this.value)"></div>`:''}
+  ${open?`<div class="card"><h2>Hisaab band karo</h2><p style="margin:0 0 8px;color:var(--mut);font-size:13px">Settle ho gaya? Jis din tak ka hisaab hua wo date daalo. Agla hisaab apne aap shuru ho jayega.</p>
+  <label>End date</label><input type="date" id="pe" value="${today()}"><button style="width:100%" onclick="closeP()">Hisaab band karo</button><p id="pm" style="color:var(--bad);margin:8px 0 0"></p></div>`:''}
+  ${open&&S.periods.length>1?`<button class="sec" style="width:100%" onclick="undoP()">↩️ Pichhla band karna wapas lo</button>`:''}`}
+function ds(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function dl(x){const n=Math.round((new Date(x+'T00:00:00')-new Date(today()+'T00:00:00'))/864e5);return n>0?n+' din baaki':n===0?'aaj aakhri din':Math.abs(n)+' din ho gaye, ab band kar sakte ho'}
+function setPlan(v){const l=S.periods[S.periods.length-1];if(v&&v<l.s){alert('Target date shuruaat se pehle nahi ho sakti');rP();return}if(v)l.plan=v;else delete l.plan;save();render()}
+function preset(n){const l=S.periods[S.periods.length-1],d=new Date(l.s+'T00:00:00');d.setDate(d.getDate()+n-1);setPlan(ds(d))}
+function setStart(v){const l=S.periods[S.periods.length-1],pv=S.periods[S.periods.length-2],min=pv?addDay(pv.e):'';if(!v||v<min||(l.plan&&v>l.plan)||S.entries.some(e=>e.date>=l.s&&e.date<v)){alert('Ye date nahi ban sakti (pichhla hisaab ya entries beech mein aa rahe hain)');rP();return}l.s=v;save();render()}
+function closeP(){
+  const d=$('pe').value,last=S.periods[S.periods.length-1];
+  if(!d||d<last.s){$('pm').textContent='End date start date ('+fd(last.s)+') se pehle nahi ho sakti';return}
+  last.e=d;S.periods.push({s:addDay(d),e:null});sel=S.periods.length-1;save();render()}
+function undoP(){
+  if(!confirm('Pichhla hisaab dobara chalu karna hai?'))return;
+  S.periods.pop();S.periods[S.periods.length-1].e=null;sel=S.periods.length-1;save();render()}
+
+function rS(){
+  $('app').innerHTML=`<div class="card"><h2>Members (${S.members.length})</h2>${S.members.map((n,i)=>`<div class="row"><input value="${esc(n)}" onchange="renM(${i},this)"><button class="del" style="flex:0 0 auto;margin-bottom:8px" onclick="delM(${i})">✕ Hatao</button></div>`).join('')}<div class="row"><input id="nm" placeholder="Naya member ka naam"><button style="flex:0 0 auto;margin-bottom:8px" onclick="addM()">➕ Add</button></div>
+  <p style="font-size:12px;color:var(--mut);margin:0">Naam badalne se purani entries mein bhi naam badal jayega. Naya member naya hisaab shuru hone par add karna best hai, warna wo poore chalu hisaab ka barabar hissa dega.</p></div>
+  <div class="card"><h2>Category ke naam</h2>${S.cats.map((n,i)=>`<input value="${esc(n)}" onchange="S.cats[${i}]=this.value.trim()||S.cats[${i}];save()">`).join('')}</div>
+  <div class="card"><h2>Backup / Restore</h2>
+  <button class="sec" style="width:100%;margin-bottom:8px" onclick="bk()">📋 Backup copy karo</button>
+  <textarea id="bt" rows="3" placeholder="Restore ke liye backup yahan paste karo"></textarea>
+  <button class="sec" style="width:100%" onclick="rs()">♻️ Restore karo</button></div>
+  <button class="sec" style="width:100%;color:var(--bad)" onclick="rst()">🗑️ Sab data mita do</button>`}
+function addM(){const v=$('nm').value.trim();if(!v)return;if(S.members.some(x=>x.toLowerCase()===v.toLowerCase())){alert('Ye naam pehle se hai');return}S.members.push(v);save();rS()}
+function renM(i,el){const v=el.value.trim(),old=S.members[i];if(!v||S.members.some((x,j)=>j!==i&&x.toLowerCase()===v.toLowerCase())){alert('Naam khali ya pehle se maujood hai');el.value=old;return}S.entries.forEach(e=>{if(e.by===old)e.by=v});S.members[i]=v;save()}
+function delM(i){const n=S.members[i];if(S.members.length<=1){alert('Kam se kam 1 member rakhna hoga');return}const cur=S.periods[S.periods.length-1],cnt=S.entries.filter(e=>e.by===n&&inP(e,cur)).length;if(confirm(n+' ko hataana hai?'+(cnt?'\n\nChalu hisaab mein iski '+cnt+' entries hain, wo ginti mein nahi aayengi. Behtar hai pehle hisaab band kar lo.':'')+'\n\nPurane band hisaab waise hi rahenge.')){S.members.splice(i,1);save();rS()}}
+function bk(){const t=JSON.stringify(S);if(window.Android&&Android.copy){Android.copy(t);alert('Backup copy ho gaya. Kahin save kar lo (WhatsApp/Notes)')}else if(navigator.clipboard){navigator.clipboard.writeText(t).then(()=>alert('Backup copy ho gaya. Kahin save kar lo (WhatsApp/Notes)'),()=>prompt('Copy karo:',t))}else prompt('Copy karo:',t)}
+function rs(){try{const d=JSON.parse($('bt').value);if(!d.members||!d.entries||!d.periods)throw 0;S=d;sel=S.periods.length-1;save();alert('Restore ho gaya');render()}catch(e){alert('Backup sahi nahi hai')}}
+function rst(){if(confirm('Saara data hamesha ke liye mit jayega. Pakka?')){S=JSON.parse(JSON.stringify(DEF));sel=0;save();render()}}
+render();
+</script>
+</body>
+</html>
